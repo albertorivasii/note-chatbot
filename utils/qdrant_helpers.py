@@ -1,12 +1,12 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue, Range
+from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue, Range, ScoredPoint
 import numpy as np
 from uuid import uuid4
 
 client= QdrantClient(host="localhost", port=6333)
 
 class QdrantHelper:
-	def __init__(self, client):
+	def __init__(self, client:QdrantClient):
 		self.client= client
 
 
@@ -49,13 +49,24 @@ class QdrantHelper:
 			raise ValueError(f"Unable to delete collection. {e}")
 
 
+	def list_collections(self) -> list[str]:
+		"""
+		Return list of collection names.
+
+		Args: None
+
+		Returns:
+			list[str]: Python list of strings corresponding to collection names in client.
+		"""
+		return self.client.get_collections().collections
+
+
 	def create_filter(self, params:dict) -> Filter:
 		"""
 		Create a Qdrant Filter object using the params argument
 
 		Args:
 			params (dict): arguments that must be true for the search query
-			optional (dict): arguments that are optional for the search query
 
 		Returns:
 			filters (Filter): Qdrant Filter object with specified parameters
@@ -80,19 +91,22 @@ class QdrantHelper:
 		
 		must= []
 		should= []
+		must_not= []
 
-		for clause in ["must", "should"]:
+		for clause in ["must", "should", "must_not"]:
 			clause_info= params.get(clause, {})
 			for field, condition in clause_info.items():
 				cond= parse_condition(field, condition)
 				if clause == "must":
 					must.append(cond)
+				elif clause == "must_not":
+					must_not.append(cond)
 				else:
 					should.append(cond)
-		return Filter(must=must, should=should)
+		return Filter(must=must or None, should=should or None, must_not=must_not or None)
 
 
-	def search_collection(self, name:str, query_vec:np.array, max_results:int=5) -> PointStruct:
+	def search_collection(self, name:str, query_vec:np.array, max_results:int=5) -> list[ScoredPoint]:
 		"""
 		Return the most similar searches to the query vector.
 
@@ -116,7 +130,7 @@ class QdrantHelper:
 			raise ValueError(f"Unable to access results. Details: {e}")
 		
 
-	def upsert_embeddings(self, name:str, embeddings:np.array, payload:dict) -> str:
+	def upsert_embeddings(self, name:str, embeddings:np.array, payloads:list[dict]) -> str:
 		"""
 		Upsert embeddings and payload into Qdrant Client.
 
@@ -136,7 +150,7 @@ class QdrantHelper:
 						vector=vector.tolist(),
 						payload=payload
 					)
-					for vector in embeddings
+					for vector, payload in zip(embeddings, payloads)
 				]
 			)
 			return "Upsert Complete."
