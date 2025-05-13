@@ -1,12 +1,12 @@
 from qdrant_client import QdrantClient
-from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition
+from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition, MatchValue, Range
 import numpy as np
 from uuid import uuid4
 
 client= QdrantClient(host="localhost", port=6333)
 
 
-def create_collection(name:str, vec_len:int, ) -> str:
+def create_collection(name:str, vec_len:int) -> str:
 	"""
 	Create a Collection in Qdrant if it does not exist.
 
@@ -45,7 +45,7 @@ def delete_collection(name:str) -> str:
 		raise ValueError(f"Unable to delete collection. {e}")
 
 
-def create_filter(params:dict, optional:dict) -> Filter:
+def create_filter(params:dict, strict:bool=False) -> Filter:
 	"""
 	Create a Qdrant Filter object using the params argument
 
@@ -56,22 +56,42 @@ def create_filter(params:dict, optional:dict) -> Filter:
 	Returns:
 		filters (Filter): Qdrant Filter object with specified parameters
 	"""
-	filters= Filter(
-		must= [
-			FieldCondition(
-				key= field,
-				match=val
+	def parse_condition(field, condition):
+		if isinstance(condition, tuple):
+			op, val = condition
+			return FieldCondition(
+				key=field,
+				range=Range(
+					gte=val if op == ">=" else None,
+					gt=val if op == ">" else None,
+					lte=val if op == "<=" else None,
+					lt=val if op == "<" else None
+				)
 			)
-		for field, val in params.items()]
-	)
-	# TODO: add optional dictionary support
+		else:
+			return FieldCondition(
+				key=field,
+				match=MatchValue(value=condition)
+			)
+	# TODO: add support for ranges like min and max nums
+	
+	must= []
+	should= []
 
-	return filters
+	for clause in ["must", "should"]:
+		clause_info= params.get(clause, {})
+		for field, condition in clause_info.items():
+			cond= parse_condition(field, condition)
+			if clause == "must":
+				must.append(cond)
+			else:
+				should.append(cond)
+	return Filter(must=must, should=should)
 
 
 def search_collection(name:str, query_vec:np.array, max_results:int=5) -> PointStruct:
 	"""
-	Return the top X most similar searches to the query vector.
+	Return the most similar searches to the query vector.
 
 	Args:
 		name (str): Name of the collection
@@ -95,7 +115,7 @@ def search_collection(name:str, query_vec:np.array, max_results:int=5) -> PointS
 
 def upsert_embeddings(name:str, embeddings:np.array, payload:dict) -> str:
 	"""
-	Upsert embeddings + payload into Qdrant Client.
+	Upsert embeddings and payload into Qdrant Client.
 
 	Args:
 		embedding (np.array[float]): Numpy array of embeddings
