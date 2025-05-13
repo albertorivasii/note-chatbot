@@ -1,6 +1,7 @@
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, FieldCondition
 import numpy as np
+from uuid import uuid4
 
 client= QdrantClient(host="localhost", port=6333)
 
@@ -44,6 +45,30 @@ def delete_collection(name:str) -> str:
 		raise ValueError(f"Unable to delete collection. {e}")
 
 
+def create_filter(params:dict, optional:dict) -> Filter:
+	"""
+	Create a Qdrant Filter object using the params argument
+
+	Args:
+		params (dict): arguments that must be true for the search query
+		optional (dict): arguments that are optional for the search query
+
+	Returns:
+		filters (Filter): Qdrant Filter object with specified parameters
+	"""
+	filters= Filter(
+		must= [
+			FieldCondition(
+				key= field,
+				match=val
+			)
+		for field, val in params.items()]
+	)
+	# TODO: add optional dictionary support
+
+	return filters
+
+
 def search_collection(name:str, query_vec:np.array, max_results:int=5) -> PointStruct:
 	"""
 	Return the top X most similar searches to the query vector.
@@ -65,27 +90,32 @@ def search_collection(name:str, query_vec:np.array, max_results:int=5) -> PointS
 
 		return hits
 	except Exception as e:
-		raise ValueError(f"Unable to access results: {e}")
+		raise ValueError(f"Unable to access results. Details: {e}")
 	
 
-def create_filter(params:dict, optional:dict) -> Filter:
+def upsert_embeddings(name:str, embeddings:np.array, payload:dict) -> str:
 	"""
-	Create a Qdrant Filter object using the params argument
+	Upsert embeddings + payload into Qdrant Client.
 
 	Args:
-		params (dict): arguments that must be true for the search query
-		optional (dict): arguments that are optional for the search query
-
+		embedding (np.array[float]): Numpy array of embeddings
+		payload (dict): Payload associated with the embeddings
+	
 	Returns:
-		filters (Filter): Qdrant Filter object with 
+		str: "Upsert Complete." if successful else "Upsert Failed. Details: {e}" where e is the error
 	"""
-	# TODO: add optional dictionary support
-	filters= Filter(
-		must= [
-			FieldCondition(
-				key= field,
-				
-			)
-		for field, val in params.items()]
-	)
-	pass
+	try:
+		client.upsert(
+			collection_name=name,
+			points= [
+				PointStruct(
+					id=uuid4(),
+					vector=vector.tolist(),
+					payload=payload
+				)
+				for vector in embeddings
+			]
+		)
+	except Exception as e:
+		raise ValueError(f"Upsert Failed. Details: {e}")
+
