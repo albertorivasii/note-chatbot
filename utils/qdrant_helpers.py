@@ -3,8 +3,6 @@ from qdrant_client.models import VectorParams, Distance, PointStruct, Filter, Fi
 import numpy as np
 from uuid import uuid4
 
-client= QdrantClient(host="localhost", port=6333)
-
 class QdrantHelper:
 	def __init__(self, client:QdrantClient):
 		self.client= client
