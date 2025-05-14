@@ -58,7 +58,7 @@ class QdrantHelper:
 		Returns:
 			list[str]: Python list of strings corresponding to collection names in client.
 		"""
-		return self.client.get_collections().collections
+		return [c.name for c in self.client.get_collections().collections]
 
 
 	def create_filter(self, params:dict) -> Filter:
@@ -106,7 +106,7 @@ class QdrantHelper:
 		return Filter(must=must or None, should=should or None, must_not=must_not or None)
 
 
-	def search_collection(self, name:str, query_vec:np.array, max_results:int=5) -> list[ScoredPoint]:
+	def search_collection(self, name:str, query_vec:np.array, max_results:int=5, filters:Filter=None) -> list[ScoredPoint]:
 		"""
 		Return the most similar searches to the query vector.
 
@@ -119,13 +119,16 @@ class QdrantHelper:
 			hits (dict): dictionary including payload of top X most similar vectors in collection.
 		"""
 		try:
-			hits= self.client.search(
+			hits= self.client.query_points(
 				collection_name=name,
-				query_vector=query_vec,
-				limit=max_results
+				query= query_vec.tolist(),
+				limit=max_results,
+				query_filter=filters,
+				with_payload=True,
+				with_vectors=False
 			)
 
-			return hits
+			return hits.points
 		except Exception as e:
 			raise ValueError(f"Unable to access results. Details: {e}")
 		
@@ -146,7 +149,7 @@ class QdrantHelper:
 				collection_name=name,
 				points= [
 					PointStruct(
-						id=uuid4(),
+						id=str(uuid4()),
 						vector=vector.tolist(),
 						payload=payload
 					)
@@ -156,4 +159,25 @@ class QdrantHelper:
 			return "Upsert Complete."
 		except Exception as e:
 			raise ValueError(f"Upsert Failed. Details: {e}")
+
+
+	def create_field_index(self, name:str, field:str, schema:str) -> str:
+		"""
+		Creates a Qdrant Index on a given Payload field.
+
+		Args:
+			name (str): Name of the Qdrant collection.
+			field (str): Name of the field in the collection to create an index on.
+			field_schema (str): Schema corresponding to the field
+
+		Returns:
+			str: "Index created on {field}." if successful, else "Index creation failed. Details: {e}" where e is the error.
+		"""
+		try:
+			self.client.create_payload_index(name, field, schema)
+			return f"Index created on {field}."
+			
+		except Exception as e:
+			return f"Index creation failed. Details: {e}"
+
 
