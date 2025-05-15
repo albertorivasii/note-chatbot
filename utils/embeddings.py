@@ -15,17 +15,31 @@ class EmbeddingModel:
         self.model= SentenceTransformer(model, device=device)
     
 
-    def embed(self, text:List[str]) -> Union[List[float], List[List[float]]]:
+    def embed_one(self, text: Union[str, List[str]]) -> List[float]:
         """
-        Embed a list of sentences with the encoding model.
+        Embed a string  using the model.
 
         Args:
-            text (str or list): Text or list of texts to embed.
+            text (str): Text to embed.
 
         Returns:
-            list[float]: Embedding vector(s).
+            List[float]: The embeddings.
         """
         return self.model.encode(text, convert_to_numpy=True).tolist()
+    
+
+    def embed_many(self, texts:List[str]) -> List[List[float]]:
+        """
+        Embed a list of strings using the model.
+
+        Args:
+            text (List[str]): Texts to embed.
+
+        Returns:
+            List[List[float]]: The embeddings.
+        """
+        return self.model.encode(texts, convert_to_numpy=True).tolist()
+        pass
 
 
     def dim(self) -> int:
@@ -55,8 +69,12 @@ class EmbeddingModel:
         Returns:
             list[dict]: List of dictionaries where keys are IDs and values are the embeddings for each sentence provided.
         """
-        vectors= self.embed(texts)
-        return [{"id":id_, "vector":vec} for id_, vec in zip(ids, vectors)]
+        if type(texts) == str:
+            vectors= self.embed_one(texts)
+            return {"id":ids, "vector":vectors}
+        else:
+            vectors= self.embed_many(texts)
+            return [{"id":id_, "vector":vec} for id_, vec in zip(ids, vectors)]
     
     
     def embed_batches(self, texts:List[str], batch_size:int=32) -> List[List[float]]:
