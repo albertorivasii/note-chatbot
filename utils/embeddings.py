@@ -46,7 +46,7 @@ class EmbeddingModel:
         """
         Returns the dimensionality of the embedding vectors.
         """
-        dummy= self.model.encode("test")
+        dummy= self.model.encode("test", convert_to_numpy=True).tolist()
         return len(dummy) if isinstance(dummy, list) and not isinstance(dummy[0], list) else len(dummy[0])
     
     
