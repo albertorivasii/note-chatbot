@@ -18,7 +18,7 @@ class LLMHelper:
         """
         full_prompt= \
         """
-        <s>[INST] You are a helpful assistant. You will be given context and a question from a user. Answer the question taking the context into consideration.
+        <s>[INST] You are a helpful assistant. Use the context below to answer the query posed by the user.
 
         Context:
         %s
