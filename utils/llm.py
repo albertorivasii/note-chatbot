@@ -1,55 +1,79 @@
+import torch
+from transformers import pipeline
+from huggingface_hub import login
+from dotenv import load_dotenv
+import os
+from typing import Union, List
 
-from llama_cpp import Llama
+load_dotenv()
 
 class LLMHelper:
-    def __init__(self, model_path:str="models/mistral-7b-instruct-v0.1.Q4_K_M.gguf"):
-        self.model= Llama(model_path=model_path, n_gpu_layers=-1, n_ctx=1024)
-        self.model_path= model_path
+    def __init__(self, model_id:str= "meta-llama/Llama-3.1-8B", model_type:str="pipeline", token=None):
+        self.model_id= model_id
+        self.model_type= model_type
+        
+        if model_type == "pipeline":
+            self.model= pipeline("text-generation",
+                                 model=model_id,
+                                 token=os.getenv("HF_API_TOKEN"),
+                                 model_kwargs={"torch_dtype":torch.bfloat16},
+                                 device_map='auto')
+        
 
-    def create_prompt(self, prompt:str, context:str) -> str:
+    def create_prompt(self, context:str, query:str) -> str:
         """
-        Returns a string formatted for use in Mistral
+        Returns a string formatted for use with a HuggingFace LLM.
         
         Args:
-            prompt (str): The instructions for Mistral
+            prompt (str): The instructions for the LLM.
             context (str): Context pulled from a Vector DB.
         Returns:
-            str: String with Mistral formatting
+            str: String with context and query formatting.
         """
-        full_prompt= \
-        """
-        <s>[INST] You are a helpful assistant. Use the context below to answer the query posed by the user.
+        if self.model_type == "mistral":
+            full_prompt= [
+                {"role":"system", "content": "you are a helpful assistant that answers the user's question considering the following context:\n %s" % context}
+            ]
+            return full_prompt
+        if self.model_type == "llama":
 
-        Context:
-        %s
+            full_prompt= \
+            """
+            You are a helpful assistant. Use the context below to answer the query posed by the user.
 
-        Query:
-        %s
-        [/INST]
-        """ % (prompt, context)
+            Context:
+            %s
 
-        return full_prompt
+            Query:
+            %s
+            """ % (context, query)
+
+            return full_prompt
     
 
-    def generate_answer(self, prompt:str) -> str:
+    def generate_answer(self, prompt:Union[List, str]) -> str:
         """
         Returns an LLM-generated answer to the question provided.
         
         Args:
-            prompt (str): Mistral formatted prompt.
+            prompt (str): Prompt including any context you require.
 
         Returns:
             str: The model's first choice answer as a string.
         """
+        if "mistral" in self.model_id:
+            output= self.model(prompt)
+            return output
+        elif "llama" in self.model_id:
+            # tokenize the input prompt
+            input= self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+            output= self.model.generate(**input, max_new_tokens=2048)
 
-        answer= self.model(prompt, max_tokens=1024, temperature=0.1)
+            return self.tokenizer.decode(output[0], skip_special_tokens=True)
+        elif self.model_type == "other":
+            pass
 
-        return answer["choices"][0]["text"]
-    
 
-import os
-model_path = os.path.abspath("models/mistral-7b-instruct-v0.1.Q4_K_M.gguf")
-llm = Llama(model_path=model_path, n_gpu_layers=50)
-print("GPU layers in use:", llm.model_params.n_gpu_layers)
+llm= LLMHelper(token=os.getenv("HF_API_TOKEN"))
 
-# TODO: Install C++ Build Tools via Visual Studio Installer and NVCC via nvidia
+llm.generate_answer("Tell me a fun fact about Large Language Models")
