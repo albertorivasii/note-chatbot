@@ -1,5 +1,5 @@
 import torch
-from transformers import pipeline
+from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 from huggingface_hub import login
 from dotenv import load_dotenv
 import os
@@ -12,13 +12,21 @@ class LLMHelper:
         self.model_id= model_id
         self.model_type= model_type
         
-        if model_type == "pipeline":
+        if model_type == "hf":
+            self.tokenizer= AutoTokenizer.from_pretrained(model_id)
+            self.model:AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
+                model_id,
+                token=os.getenv("HF_TOKEN")
+            )
+            self.model.to("cuda")
+            
+        elif model_type == "pipeline":
             self.model= pipeline("text-generation",
                                  model=model_id,
                                  token=os.getenv("HF_API_TOKEN"),
                                  model_kwargs={"torch_dtype":torch.bfloat16},
                                  device_map='auto')
-        
+    
 
     def create_prompt(self, context:str, query:str) -> str:
         """
@@ -30,12 +38,12 @@ class LLMHelper:
         Returns:
             str: String with context and query formatting.
         """
-        if self.model_type == "mistral":
+        if "mistral" in self.model_id:
             full_prompt= [
                 {"role":"system", "content": "you are a helpful assistant that answers the user's question considering the following context:\n %s" % context}
             ]
             return full_prompt
-        if self.model_type == "llama":
+        if "llama" in self.model_id:
 
             full_prompt= \
             """
@@ -74,6 +82,8 @@ class LLMHelper:
             pass
 
 
-llm= LLMHelper(token=os.getenv("HF_API_TOKEN"))
+llm= LLMHelper(token=os.getenv("HF_TOKEN"))
 
-llm.generate_answer("Tell me a fun fact about Large Language Models")
+output= llm.generate_answer("Tell me a fun fact about Large Language Models")
+
+print(output)
