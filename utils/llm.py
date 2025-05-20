@@ -101,10 +101,4 @@ bnb_config= BitsAndBytesConfig(
             bnb_4bit_use_double_quant=True,
             bnb_4bit_quant_type="nf4"
         )
-assert torch.cuda.is_available(), "Cuda is not available."
-
-llm= LLMHelper(model_id="RedHatAI/Meta-Llama-3-8B-Instruct-quantized.w4a16", model_type="hf", token=os.getenv("HF_TOKEN"), bnb_config=bnb_config)
-llm_prompt= llm.create_prompt("Nitamonkey is corny.", "What adjective would you use to describe Nitamonkey?")
-answer= llm.generate_answer(llm_prompt)
-print(answer)
 
