@@ -1,6 +1,5 @@
 import torch
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-from huggingface_hub import login
 from dotenv import load_dotenv
 import os
 from typing import Union, List
@@ -94,11 +93,4 @@ class LLMHelper:
         #     pass
 
 #login(token=os.environ.get("HF_TOKEN"))
-
-bnb_config= BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4"
-        )
 
